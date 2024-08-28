@@ -4,6 +4,7 @@ export type Orientation = [pitch: number, yaw: number, roll: number];
 
 export type State = {
   time: number;
+  bootTime: number;
   position: Position;
   orientation: Orientation;
   target: Position;

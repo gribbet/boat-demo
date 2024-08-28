@@ -19,6 +19,7 @@ const { Heartbeat } = minimal;
 export const createVehicle = (mavlink: Mavlink) => {
   const state: State = {
     time: Date.now(),
+    bootTime: 0,
     position: [0, 0, 0],
     orientation: [0, 0, 0],
     target: [0, 0, 0],
@@ -44,6 +45,9 @@ export const createVehicle = (mavlink: Mavlink) => {
     } else if (message instanceof Heartbeat)
       state.armed = !!(message.baseMode & minimal.MavModeFlag.SAFETY_ARMED);
     else if (message instanceof StatusText) console.log(message.text);
+
+    if ("timeBootMs" in message && typeof message.timeBootMs === "number")
+      state.bootTime = message.timeBootMs;
   });
 
   const heartbeat = async () => {
@@ -78,10 +82,31 @@ export const createVehicle = (mavlink: Mavlink) => {
     await mavlink.write(message);
   };
 
+  const disarm = async ({ force }: { force?: boolean } = {}) => {
+    const message = new CommandLong();
+    message.command = MavCmd.COMPONENT_ARM_DISARM;
+    message._param2 = force ? 21196 : 0;
+    await mavlink.write(message);
+  };
+
+  const reboot = async () => {
+    if (state.armed) await disarm({ force: true });
+    const message = new CommandLong();
+    message.command = MavCmd.PREFLIGHT_REBOOT_SHUTDOWN;
+    message._param1 = 1;
+    await mavlink.write(message);
+    console.log("Reboot");
+  };
+
   const step = async () => {
     await heartbeat();
     state.path.unshift(state.position);
     if (state.path.length > 10000) state.path.length = 10000;
+
+    if (state.bootTime > 30 * 60 * 1000) {
+      await reboot();
+      state.bootTime = 0;
+    }
   };
 
   const interval = setInterval(step, 200);
