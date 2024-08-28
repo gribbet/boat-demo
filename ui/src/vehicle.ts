@@ -1,7 +1,5 @@
-import type { MavLinkData, MavLinkDataConstructor } from "node-mavlink";
 import { ardupilotmega, common, minimal } from "node-mavlink";
 
-import { delay } from "./common";
 import type { Mavlink } from "./mavlink";
 import type { Position, State, Vehicle } from "./model";
 
@@ -64,55 +62,13 @@ export const createVehicle = (mavlink: Mavlink) => {
     await mavlink.write(message);
   };
 
-  const receive = async <T extends MavLinkData>(
-    type: new (...args: unknown[]) => T,
-    condition?: (message: T) => boolean,
-    cancel?: Promise<never>,
-  ) => {
-    let unsubscribe: (() => void) | undefined;
-    try {
-      return await Promise.race([
-        new Promise<T>(resolve => {
-          unsubscribe = mavlink.read(message => {
-            if (message instanceof type && (!condition || condition(message)))
-              resolve(message);
-          });
-        }),
-        ...(cancel ? [cancel] : []),
-      ]);
-    } finally {
-      unsubscribe?.();
-    }
-  };
-
-  const sendAndReceive = async <T extends MavLinkData>(
-    message: MavLinkData,
-    received?: Promise<T>,
-    cancel?: Promise<never>,
-  ) => {
-    const timeout = 500;
-    for (let i = 0; ; i++) {
-      await mavlink.write(message);
-      const wait = Math.min(10000, timeout * 1.25 ** i);
-      const result = await Promise.race([
-        received,
-        delay(wait),
-        ...(cancel ? [cancel] : []),
-      ]);
-      if (result) return result;
-      const type = (message.constructor as MavLinkDataConstructor<MavLinkData>)
-        .MSG_NAME;
-      console.log("Retry", { type });
-    }
-  };
-
   const sendCommand = async (
     message: common.CommandLong | common.CommandInt,
     cancel?: Promise<never>,
   ) => {
-    const result = await sendAndReceive(
+    const result = await mavlink.retry(
       message,
-      receive(common.CommandAck, _ => _.command === message.command),
+      mavlink.receive(common.CommandAck, _ => _.command === message.command),
       cancel,
     );
     if (result.result !== MavResult.ACCEPTED)
@@ -167,9 +123,9 @@ export const createVehicle = (mavlink: Mavlink) => {
     message.count = count;
     message.missionType = MavMissionType.MISSION;
 
-    await sendAndReceive(
+    await mavlink.retry(
       message,
-      receive(common.MissionRequest, _ => _.seq === 0),
+      mavlink.receive(common.MissionRequest, _ => _.seq === 0),
       cancel,
     );
   };
@@ -204,7 +160,7 @@ export const createVehicle = (mavlink: Mavlink) => {
 
     await missionCount(items.length, cancel);
 
-    const complete = receive(
+    const complete = mavlink.receive(
       common.MissionAck,
       _ => _.type !== MavMissionResult.INVALID_SEQUENCE,
       cancel,
@@ -216,12 +172,12 @@ export const createVehicle = (mavlink: Mavlink) => {
         const last = i === items.length - 1;
         const missionRequest = (seq: number) =>
           Promise.race([
-            receive(common.MissionRequest, _ => _.seq === seq),
+            mavlink.receive(common.MissionRequest, _ => _.seq === seq),
             complete,
           ]);
         if (last) await missionRequest(i);
 
-        await sendAndReceive(
+        await mavlink.retry(
           item,
           Promise.race([complete, last ? complete : missionRequest(i + 1)]),
           cancel,
