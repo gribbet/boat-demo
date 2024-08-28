@@ -1,0 +1,16 @@
+{
+  "name": "@boat-demo/infrastructure",
+  "private": true,
+  "scripts": {
+    "lint": "eslint --max-warnings 0 --cache --cache-strategy content ."
+  },
+  "dependencies": {
+    "@pulumi/aws": "^6.20.1",
+    "@pulumi/awsx": "^2.5.0",
+    "@pulumi/eks": "^2.2.1",
+    "@pulumi/kubernetes": "^4.7.1",
+    "@pulumi/kubernetes-cert-manager": "^0.0.5",
+    "@pulumi/kubernetes-ingress-nginx": "^0.0.10",
+    "@pulumi/pulumi": "^3.104.2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "boat-demo",
+  "workspaces": [
+    "eslint-config",
+    "infrastructure",
+    "ui"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "dependencies": {
+    "eslint": "^8.56.0",
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "prettier": "^3.1.1"
+  }
+}

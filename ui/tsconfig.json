@@ -1,0 +1,7 @@
+{
+  "extends": "..",
+  "compilerOptions": {
+    "lib": ["WebWorker", "ES2022"],
+    "esModuleInterop": true
+  }
+}
