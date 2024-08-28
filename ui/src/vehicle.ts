@@ -118,7 +118,7 @@ export const createVehicle = (mavlink: Mavlink) => {
     if (result.result !== MavResult.ACCEPTED)
       console.warn("Command failure", result);
   };
-  const navigate = async ([longitude, latitude]: Position) => {
+  const navigate = async ([longitude, latitude, altitude]: Position) => {
     const message = new CommandInt();
     message.targetComponent = 0;
     message.command = MavCmd.DO_REPOSITION;
@@ -126,7 +126,7 @@ export const createVehicle = (mavlink: Mavlink) => {
     message._param2 = MavDoRepositionFlags.CHANGE_MODE;
     message._param5 = latitude * 1e7;
     message._param6 = longitude * 1e7;
-    message._param7 = 0;
+    message._param7 = altitude;
     await sendCommand(message);
   };
 
@@ -178,21 +178,27 @@ export const createVehicle = (mavlink: Mavlink) => {
     waypoints: Position[],
     cancel?: Promise<never>,
   ) => {
-    const items = waypoints.map(([lng, lat, alt], i) => {
-      const item = new common.MissionItemInt();
-      item.targetComponent = 0;
-      item.seq = i;
-      item.frame = MavFrame.GLOBAL_RELATIVE_ALT;
-      item.command = MavCmd.NAV_WAYPOINT;
-      item.param1 = 0;
-      item.param2 = 0;
-      item.param3 = 0;
-      item.param4 = 0;
-      item.x = lat * 1e7;
-      item.y = lng * 1e7;
-      item.z = alt;
-      return item;
-    });
+    const [home] = waypoints;
+    if (!home) return;
+    const points = [home, ...waypoints].map(
+      ([longitude, latitude, altitude], i) => {
+        const item = new common.MissionItemInt();
+        item.seq = i;
+        item.frame = MavFrame.GLOBAL_RELATIVE_ALT;
+        item.command = MavCmd.NAV_WAYPOINT;
+        item.x = latitude * 1e7;
+        item.y = longitude * 1e7;
+        item.z = altitude;
+        return item;
+      },
+    );
+    const reset = new common.MissionItemInt();
+    reset.seq = points.length;
+    reset.frame = MavFrame.GLOBAL_RELATIVE_ALT;
+    reset.command = MavCmd.DO_JUMP;
+    reset.param1 = 1;
+    reset.param2 = -1;
+    const items = [...points, reset];
 
     console.log(`Writing mission with ${items.length} waypoints`);
 
@@ -227,23 +233,35 @@ export const createVehicle = (mavlink: Mavlink) => {
     const ack = await complete;
 
     if (ack.type !== MavMissionResult.ACCEPTED) {
-      console.warn(
-        `Mission write failure: ${MavMissionResult[ack.type]}. Retrying`,
-      );
+      console.warn(`Mission write failure: ${MavMissionResult[ack.type]}`);
       return;
     }
 
     console.log("Mission write complete");
   };
 
+  const setMissionCurrent = async (index: number) => {
+    const message = new CommandLong();
+    message.command = MavCmd.DO_SET_MISSION_CURRENT;
+    message._param1 = index;
+    message._param2 = 1; // Reset mission
+
+    await sendCommand(message);
+  };
+
   const start = async () => {
     await writeMission([
-      [25.67776, -77.797865, 0],
-      [25.67876, -77.797865, 0],
-      [25.67976, -77.797965, 0],
-      [25.67076, -77.797965, 0],
+      [-77.79155, 25.68001, 0],
+      [-77.78964, 25.67868, 0],
+      [-77.78943, 25.67889, 0],
+      [-77.79144, 25.68022, 0],
+      [-77.79129, 25.6806, 0],
+      [-77.78928, 25.67926, 0],
+      [-77.78919, 25.67953, 0],
+      [-77.79102, 25.68063, 0],
     ]);
-    await arm();
+    await setMissionCurrent(0);
+    if (!state.armed) await arm();
     await auto();
   };
 
@@ -260,7 +278,7 @@ export const createVehicle = (mavlink: Mavlink) => {
       state.bootTime = 0;
     }
 
-    if (!state.armed && !started) {
+    if (!started) {
       started = true;
       await start();
     }

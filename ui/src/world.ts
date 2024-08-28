@@ -86,7 +86,7 @@ export const createWorld = (
     imageryUrl: () =>
       "https://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}",
     onRightClick: ({ position: [lng = 0, lat = 0, alt = 0] }) =>
-      onTarget([lng, lat, alt + 200]),
+      onTarget([lng, lat, alt]),
   });
 
   const vehicle = createVehicleLayer(context, { state, onClick: onFollow });
