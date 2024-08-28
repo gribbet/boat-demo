@@ -98,12 +98,14 @@ export const createVehicle = (mavlink: Mavlink) => {
     console.log("Reboot");
   };
 
+  let rebooted = false;
   const step = async () => {
     await heartbeat();
     state.path.unshift(state.position);
     if (state.path.length > 10000) state.path.length = 10000;
 
-    if (state.bootTime > 30 * 60 * 1000) {
+    if (state.bootTime > 60 * 60 * 1000 && !rebooted) {
+      rebooted = true;
       await reboot();
       state.bootTime = 0;
     }
