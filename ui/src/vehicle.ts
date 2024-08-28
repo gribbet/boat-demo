@@ -104,7 +104,7 @@ export const createVehicle = (mavlink: Mavlink) => {
     state.path.unshift(state.position);
     if (state.path.length > 10000) state.path.length = 10000;
 
-    if (state.bootTime > 60 * 60 * 1000 && !rebooted) {
+    if (state.bootTime > 60 * 60 * 1000 && state.armed && !rebooted) {
       rebooted = true;
       await reboot();
       state.bootTime = 0;
