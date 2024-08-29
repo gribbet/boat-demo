@@ -1,5 +1,6 @@
 import { ardupilotmega, common, minimal } from "node-mavlink";
 
+import { delay } from "./common";
 import type { Mavlink } from "./mavlink";
 import type { Position, State, Vehicle } from "./model";
 
@@ -75,6 +76,7 @@ export const createVehicle = (mavlink: Mavlink) => {
       console.warn("Command failure", result);
   };
   const navigate = async ([longitude, latitude, altitude]: Position) => {
+    if (!state.armed) await arm();
     const message = new CommandInt();
     message.targetComponent = 0;
     message.command = MavCmd.DO_REPOSITION;
@@ -232,9 +234,11 @@ export const createVehicle = (mavlink: Mavlink) => {
       rebooted = true;
       await reboot();
       state.bootTime = 0;
+      await delay(1000);
+      await start();
     }
 
-    if (!started) {
+    if (!started && !rebooted) {
       started = true;
       await start();
     }
